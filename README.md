@@ -88,14 +88,12 @@ the workflow summary.
 
 ## CI
 
-`.github/workflows/test.yml` runs on:
+`.github/workflows/test.yml` currently runs only through manual dispatch, with a
+dist-tag or git ref. Other triggers are disabled during setup. Automatic
+dependency PRs and PR lockfile validation are not configured yet.
 
-- `repository_dispatch` with type `carbon-published`, sent by upstream after a
-  release (see below)
-- a schedule every 6 hours as a fallback, which skips a release set that already
-  passed
-- manual dispatch, with a dist-tag or git ref
-- pull requests and pushes to this repo
+Slack and upstream statuses are disabled by default. Keep
+`ENABLE_SLACK_NOTIFICATIONS` and `ENABLE_UPSTREAM_STATUS` unset during setup.
 
 Secrets:
 
@@ -105,6 +103,8 @@ Secrets:
 | `SLACK_WEBHOOK_URL` | Optional. Posts failures to Slack                                                                                 |
 
 ## Connecting upstream
+
+These examples are not enabled in this setup; `repository_dispatch` is disabled.
 
 ### After each release
 

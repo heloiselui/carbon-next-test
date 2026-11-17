@@ -1,28 +1,17 @@
 name: Test Carbon next
 
 on:
-  # Fallback for releases that did not dispatch; skipped when the release set
-  # already passed.
-  schedule:
-    - cron: '0 */6 * * *'
+  # Automatic triggers stay disabled during initial setup.
   workflow_dispatch:
     inputs:
       tag:
         description: npm dist-tag to test (ignored when ref is set)
+        type: string
         default: v12-alpha
       ref:
         description: Upstream git tag or commit to read the release set from
+        type: string
         required: false
-  # Sent by carbon-design-system/carbon after publishing. client_payload:
-  #   ref      git tag or commit the packages were published from (required)
-  #   sha      commit to report a status on (optional)
-  #   run_id   workflow run with a `carbon-tarballs` artifact, for testing
-  #            unpublished commits (optional)
-  repository_dispatch:
-    types: [carbon-published]
-  pull_request:
-  push:
-    branches: [main]
 
 concurrency:
   group:
@@ -37,6 +26,7 @@ jobs:
   resolve:
     name: Resolve release set
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     outputs:
       key: ${{ steps.key.outputs.key }}
       tested: ${{ steps.tested.outputs.cache-hit }}
@@ -49,10 +39,13 @@ jobs:
         if: github.event.client_payload.run_id
         env:
           GH_TOKEN: ${{ secrets.CARBON_REPO_TOKEN }}
-        run: >
-          gh run download ${{ github.event.client_payload.run_id }} --repo
-          carbon-design-system/carbon --name carbon-tarballs --dir
-          carbon-tarballs
+          RUN_ID: ${{ github.event.client_payload.run_id }}
+        run: |
+          case "$RUN_ID" in
+            ''|*[!0-9]*) echo 'Expected a numeric workflow run ID' >&2; exit 1 ;;
+          esac
+          gh run download "$RUN_ID" --repo carbon-design-system/carbon \
+            --name carbon-tarballs --dir carbon-tarballs
       - name: Resolve
         id: release
         env:
@@ -100,6 +93,7 @@ jobs:
     needs: resolve
     if: needs.resolve.outputs.tested != 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -113,12 +107,22 @@ jobs:
         if: always()
         run:
           cat reports/api-diff.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+      - name: Preserve contract reports
+        if: always() && !cancelled()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: contract-report
+          path: |
+            carbon-release.json
+            yarn.lock
+            reports/
 
   apps:
     name: Apps (React ${{ matrix.react }})
     needs: resolve
     if: needs.resolve.outputs.tested != 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -145,9 +149,11 @@ jobs:
             node .yarn/releases/yarn-4.10.3.cjs workspace "@carbon-next-test/$app" build
             echo "::endgroup::"
           done
-          cat reports/sass.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
         env:
           NEXT_TELEMETRY_DISABLED: 1
+      - name: Report Sass build
+        if: always() && !cancelled()
+        run: cat reports/sass.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
       - name: Unit tests
         run: node .yarn/releases/yarn-4.10.3.cjs test:unit
       - name: Install Playwright
@@ -158,22 +164,33 @@ jobs:
         run: |
           export APPS="$(echo "$APPS" | tr ',' '\n' | grep -v '^styles-sass$' | paste -sd, -)"
           node .yarn/releases/yarn-4.10.3.cjs test:e2e
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: failure()
+      - name: Preserve app reports
+        if: always() && !cancelled()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: playwright-report-react-${{ matrix.react }}
-          path: tests/e2e/playwright-report
+          name: app-report-react-${{ matrix.react }}
+          path: |
+            carbon-release.json
+            yarn.lock
+            reports/
+            tests/e2e/playwright-report/
+            tests/e2e/test-results/
 
   report:
     name: Report
     needs: [resolve, contract, apps]
-    if: always() && needs.resolve.outputs.tested != 'true'
+    if: always() && !cancelled() && needs.resolve.outputs.tested != 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Result
         id: result
+        env:
+          RESOLVE_RESULT: ${{ needs.resolve.result }}
+          CONTRACT_RESULT: ${{ needs.contract.result }}
+          APPS_RESULT: ${{ needs.apps.result }}
         run: |
-          if [ "${{ needs.contract.result }}" = success ] && [ "${{ needs.apps.result }}" = success ]; then
+          if [ "$RESOLVE_RESULT" = success ] && [ "$CONTRACT_RESULT" = success ] && [ "$APPS_RESULT" = success ]; then
             echo "state=success" >> "$GITHUB_OUTPUT"
           else
             echo "state=failure" >> "$GITHUB_OUTPUT"
@@ -189,7 +206,11 @@ jobs:
           path: carbon-release.json
           key: ${{ needs.resolve.outputs.key }}
       - name: Report status upstream
-        if: github.event.client_payload.sha
+        if: >-
+          always() && !cancelled() && github.repository ==
+          'carbon-design-system/carbon-next-test' && vars.ENABLE_UPSTREAM_STATUS
+          == 'true' && github.event_name == 'repository_dispatch' &&
+          github.event.client_payload.sha
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           github-token: ${{ secrets.CARBON_REPO_TOKEN }}
@@ -204,12 +225,31 @@ jobs:
               target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
             });
       - name: Notify Slack
-        if: >
+        if: >-
+          always() && !cancelled() && github.repository ==
+          'carbon-design-system/carbon-next-test' &&
+          vars.ENABLE_SLACK_NOTIFICATIONS == 'true' &&
           steps.result.outputs.state == 'failure' && github.event_name !=
           'pull_request'
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          RELEASE_REF:
+            ${{ github.event.client_payload.ref || inputs.ref || inputs.tag ||
+            'v12-alpha' }}
+          RUN_URL:
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{
+            github.run_id }}
         run: |
-          [ -z "$SLACK_WEBHOOK_URL" ] && exit 0
-          curl -sS -X POST -H 'Content-type: application/json' "$SLACK_WEBHOOK_URL" \
-            --data "{\"text\":\"carbon-next-test failed for ${{ github.event.client_payload.ref || inputs.ref || inputs.tag || 'v12-alpha' }}: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}"
+          if [ -z "$SLACK_WEBHOOK_URL" ]; then
+            echo 'SLACK_WEBHOOK_URL is required when Slack notifications are enabled' >&2
+            exit 1
+          fi
+          payload=$(node -e 'process.stdout.write(JSON.stringify({text: `carbon-next-test failed for ${process.env.RELEASE_REF}: ${process.env.RUN_URL}`}))')
+          curl --fail-with-body --silent --show-error --max-time 30 \
+            -X POST -H 'Content-type: application/json' \
+            --data "$payload" "$SLACK_WEBHOOK_URL"
+      - name: Enforce test result
+        if: always() && !cancelled()
+        env:
+          TEST_STATE: ${{ steps.result.outputs.state }}
+        run: test "$TEST_STATE" = success
