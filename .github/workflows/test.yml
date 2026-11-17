@@ -77,7 +77,8 @@ jobs:
         id: key
         run:
           echo "key=tested-${{ hashFiles('carbon-release.json', 'yarn.lock',
-          'apps/**', 'tests/**', 'scripts/**') }}" >> "$GITHUB_OUTPUT"
+          '.yarn/releases/**', 'apps/**', 'tests/**', 'scripts/**') }}" >>
+          "$GITHUB_OUTPUT"
       - name: Check whether this set already passed
         id: tested
         if: github.event_name == 'schedule'
@@ -107,7 +108,7 @@ jobs:
       - uses: ./.github/actions/install
         with:
           react: 19
-      - run: yarn test:contract
+      - run: node .yarn/releases/yarn-4.10.3.cjs test:contract
       - name: Report public API changes
         if: always()
         run:
@@ -141,22 +142,22 @@ jobs:
         run: |
           for app in ${APPS//,/ }; do
             echo "::group::$app"
-            yarn workspace "@carbon-next-test/$app" build
+            node .yarn/releases/yarn-4.10.3.cjs workspace "@carbon-next-test/$app" build
             echo "::endgroup::"
           done
           cat reports/sass.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
         env:
           NEXT_TELEMETRY_DISABLED: 1
       - name: Unit tests
-        run: yarn test:unit
+        run: node .yarn/releases/yarn-4.10.3.cjs test:unit
       - name: Install Playwright
         run:
-          yarn workspace @carbon-next-test/e2e playwright install --with-deps
-          chromium
+          node .yarn/releases/yarn-4.10.3.cjs workspace @carbon-next-test/e2e
+          playwright install --with-deps chromium
       - name: End-to-end tests
         run: |
           export APPS="$(echo "$APPS" | tr ',' '\n' | grep -v '^styles-sass$' | paste -sd, -)"
-          yarn test:e2e
+          node .yarn/releases/yarn-4.10.3.cjs test:e2e
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with:
