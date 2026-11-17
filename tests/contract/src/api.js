@@ -6,6 +6,8 @@ import { globSync } from 'tinyglobby';
 import { repoRoot } from './release.js';
 
 const cacheDir = path.join(repoRoot, '.cache', 'api');
+const NON_PUBLIC_SOURCE =
+  /(?:^|\/)(?:__tests__|_story-assets|examples)(?:\/|$)/;
 
 /**
  * Public API surfaces to compare between releases.
@@ -101,6 +103,10 @@ function customElements(dir) {
     }
   } else if (Array.isArray(manifest.tags)) {
     for (const tag of manifest.tags) {
+      // Older WCA manifests included demos, tests, and unresolved identifiers.
+      if (NON_PUBLIC_SOURCE.test(tag.path ?? '') || !tag.name.includes('-')) {
+        continue;
+      }
       entries.push(`<${tag.name}>`);
       for (const attribute of tag.attributes ?? []) {
         entries.push(`<${tag.name} ${attribute.name.toLowerCase()}>`);
