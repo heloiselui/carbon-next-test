@@ -150,8 +150,9 @@ describe('@carbon/web-components', () => {
     expect(repeated).toEqual([]);
   });
 
-  test('custom-elements.json only declares public elements', () => {
-    const publicUnprefixed = new Set(['feature-flags']);
+  test('custom-elements.json uses public tag names', () => {
+    // Step flows document <step-group> as a public utility.
+    const publicUnprefixed = new Set(['feature-flags', 'step-group']);
     expect(
       manifestTags(webComponentsManifest()).filter(
         (tag) => !tag.startsWith('cds-') && !publicUnprefixed.has(tag)

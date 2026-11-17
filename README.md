@@ -1,11 +1,11 @@
 # carbon-next-test
 
-This repoi installs Carbon packages published from the
-[next](https://github.com/carbon-design-system/carbon/tree/next)
-and uses them the same way consumers do: in fresh installs, real bundlers, server
-rendering, Sass builds, and browsers. The goal is to catch problems that only appear in
-the published packages, such as missing files, mismatched internal versions,
-broken entry points, or builds that fail in a framework.
+This repo installs Carbon packages published from the
+[next](https://github.com/carbon-design-system/carbon/tree/next) and uses them
+the same way consumers do: in fresh installs, real bundlers, server rendering,
+Sass builds, and browsers. The goal is to catch problems that only appear in the
+published packages, such as missing files, mismatched internal versions, broken
+entry points, or builds that fail in a framework.
 
 Component behavior, accessibility, and visual regressions are tested upstream.
 This repo does not repeat those tests.
@@ -25,19 +25,26 @@ This repo does not repeat those tests.
 
 ## Running locally
 
-Requires the Node version in `.nvmrc` and Corepack.
+Requires the Node version in `.nvmrc`. Yarn 4.10.3 is included in the repo;
+Corepack is not required.
 
 ```sh
-corepack enable
-yarn use-carbon --tag v12-alpha   # or --ref v12.0.0-alpha.5
-yarn install
-yarn test                         # contract, builds, unit, end-to-end; stops at the first failure
+node .yarn/releases/yarn-4.10.3.cjs install --immutable
+node .yarn/releases/yarn-4.10.3.cjs workspace @carbon-next-test/e2e playwright install chromium
+node .yarn/releases/yarn-4.10.3.cjs test
 ```
 
-Run one part at a time with `yarn test:contract`, `yarn build`,
-`yarn test:unit`, or `yarn test:e2e`. The end-to-end tests need
-`yarn workspace @carbon-next-test/e2e playwright install chromium` once, and
-`APPS=react-vite,web-components-vite yarn test:e2e` limits them to some apps.
+`test` runs contracts, builds, unit tests, and end-to-end tests, stopping at the
+first failure. Run one part at a time by replacing `test` in the command above
+with `test:contract`, `build`, `test:unit`, or `test:e2e`. Prefix the end-to-end
+command with `APPS=react-vite,web-components-vite` to limit it to some apps.
+
+To update the Carbon packages under test:
+
+```sh
+node scripts/use-carbon.mjs --tag v12-alpha   # or --ref v12.0.0-alpha.5
+node .yarn/releases/yarn-4.10.3.cjs install
+```
 
 ## Choosing what to test
 
@@ -81,14 +88,12 @@ the workflow summary.
 
 ## CI
 
-`.github/workflows/test.yml` runs on:
+`.github/workflows/test.yml` currently runs only through manual dispatch, with a
+dist-tag or git ref. Other triggers are disabled during setup. Automatic
+dependency PRs and PR lockfile validation are not configured yet.
 
-- `repository_dispatch` with type `carbon-published`, sent by upstream after a
-  release (see below)
-- a schedule every 6 hours as a fallback, which skips a release set that already
-  passed
-- manual dispatch, with a dist-tag or git ref
-- pull requests and pushes to this repo
+Slack and upstream statuses are disabled by default. Keep
+`ENABLE_SLACK_NOTIFICATIONS` and `ENABLE_UPSTREAM_STATUS` unset during setup.
 
 Secrets:
 
@@ -98,6 +103,8 @@ Secrets:
 | `SLACK_WEBHOOK_URL` | Optional. Posts failures to Slack                                                                                 |
 
 ## Connecting upstream
+
+These examples are not enabled in this setup; `repository_dispatch` is disabled.
 
 ### After each release
 

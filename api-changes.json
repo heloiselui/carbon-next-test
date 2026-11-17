@@ -1,3 +1,13 @@
 {
-  "$comment": "Acknowledged public API removals, keyed by package and the version that removed them. The API diff test fails on any removal not listed here."
+  "$comment": "Documented API removals by package and release version. PageHeader removals in 2.0.0-alpha.6: https://github.com/carbon-design-system/carbon/pull/23871",
+  "@carbon/react": {
+    "2.0.0-alpha.6": [
+      "preview__PageHeader",
+      "unstable__PageHeader",
+      "scss/components/page-header/page-header"
+    ]
+  },
+  "@carbon/styles": {
+    "2.0.0-alpha.6": ["scss/components/page-header/page-header"]
+  }
 }

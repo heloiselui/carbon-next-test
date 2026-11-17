@@ -98,6 +98,15 @@ function runNode(args) {
   }
 }
 
+function resolveEntryPoint(specifier) {
+  return runNode([
+    '--input-type=module',
+    '-e',
+    `import { accessSync } from 'node:fs';
+     accessSync(new URL(import.meta.resolve(${JSON.stringify(specifier)})));`,
+  ]);
+}
+
 describe.each(packages)('$name', ({ name, dir, config, manifest }) => {
   test('installs the version in the release set', () => {
     const expected = expectedVersion(name);
@@ -158,17 +167,12 @@ describe.each(packages)('$name', ({ name, dir, config, manifest }) => {
     );
   });
 
-  test.runIf(
-    Boolean(manifest.main || manifest.module) || hasRootEntry(manifest)
-  )('resolves its root entry point in Node', () => {
-    expect(
-      runNode([
-        '--input-type=module',
-        '-e',
-        `import.meta.resolve(${JSON.stringify(name)})`,
-      ])
-    ).toBeNull();
-  });
+  test.runIf(hasRootEntry(manifest))(
+    'resolves its root entry point in Node',
+    () => {
+      expect(resolveEntryPoint(name)).toBeNull();
+    }
+  );
 
   test.runIf(hasRootEntry(manifest) && config.nodeLoad !== false)(
     'loads in Node with import and require',
@@ -185,6 +189,14 @@ describe.each(packages)('$name', ({ name, dir, config, manifest }) => {
       }
     }
   );
+});
+
+test.each([
+  '@carbon/web-components/es',
+  '@carbon/web-components/es/components/dropdown/dropdown.js',
+  '@carbon/web-components/es/components/dropdown/index.js',
+])('resolves the public entry point %s', (specifier) => {
+  expect(resolveEntryPoint(specifier)).toBeNull();
 });
 
 test('installs a single copy of each @carbon/* package', () => {

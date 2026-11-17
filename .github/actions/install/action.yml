@@ -18,7 +18,6 @@ runs:
         # The catalog changes with every release set, so the lockfile does too.
         YARN_ENABLE_IMMUTABLE_INSTALLS: 'false'
       run: |
-        corepack enable
         if [ -d .release/carbon-tarballs ]; then mv .release/carbon-tarballs carbon-tarballs; fi
         node scripts/use-carbon.mjs --release .release/carbon-release.json --react ${{ inputs.react }}
-        yarn install
+        node .yarn/releases/yarn-4.10.3.cjs install
