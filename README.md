@@ -135,10 +135,11 @@ App already used upstream to be installed on this repository.
 
 ### On every commit
 
-If `next` starts publishing on every commit, the same dispatch works unchanged.
-To test commits without publishing them, a workflow on pushes to `next` can
-upload tarballs and pass its run ID instead. This runs alongside upstream CI and
-does not add time to it:
+When packages change on `next`, `next-release.yml` creates an alpha tag and
+`release.yml` publishes the packages. Send the dispatch after `Publish packages`
+succeeds. To test commits without publishing them, a workflow on pushes to
+`next` can upload tarballs and pass its run ID instead. This runs alongside
+upstream CI and does not add time to it:
 
 ```yaml
 - run: yarn build
