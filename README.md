@@ -88,99 +88,23 @@ the workflow summary.
 
 ## CI
 
-`.github/workflows/test.yml` runs on PRs and pushes to `main`. React 19 jobs
-install the committed catalog and lockfile with `--immutable`, without selecting
-new package versions. The React 18 compatibility job uses the same Carbon
-release set with a separate React 18 install.
+On PRs and pushes to `main`, `.github/workflows/test.yml` tests the versions
+saved in the repo. React 19 jobs install with `--immutable`, so the lockfile
+must stay unchanged. The React 18 job uses the same Carbon package versions with
+a separate React 18 install.
 
-Manual runs can still select a dist-tag or git ref.
+Manual runs can still select an npm tag or an upstream tag or commit.
 
-`.github/workflows/update.yml` checks `v12-alpha` hourly, accepts a
-`carbon-published` dispatch, or runs manually with an alpha tag. It checks that
-the complete release set is published, then creates or updates one dependency PR
-containing `carbon-release.json`, `.yarnrc.yml`, and `yarn.lock`. No PR is
-needed when these files already match `main`.
+When enabled in the official repo, `.github/workflows/update.yml` checks
+`v12-alpha` hourly. It can also receive a `carbon-published` event or run
+manually with a published alpha tag. It checks that all required packages are on
+npm, then opens or updates one PR with `carbon-release.json`, `.yarnrc.yml`, and
+`yarn.lock`. No update PR is needed when these files already match `main`.
 
-To enable updates, install the Carbon GitHub App on this repository with
-Contents and Pull requests write permissions, provide `APP_ID` and
-`APP_PRIVATE_KEY`, and set `ENABLE_DEPENDENCY_UPDATES` to `true`. Updates run
-only in `carbon-design-system/carbon-next-test`. An App token lets the PR checks
-start automatically.
-
-After validating the workflow, require the `Report` check on `main`. Dependency
-PRs remain blocked while required checks fail.
-
-Slack and upstream statuses are disabled by default. Keep
-`ENABLE_SLACK_NOTIFICATIONS` and `ENABLE_UPSTREAM_STATUS` unset during setup.
-
-Secrets:
-
-| Secret              | Used for                                                                                                          |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `APP_ID`            | Required for automatic updates. Carbon GitHub App ID                                                              |
-| `APP_PRIVATE_KEY`   | Required for automatic updates. Carbon GitHub App private key                                                     |
-| `CARBON_REPO_TOKEN` | Optional. Reports a commit status on carbon-design-system/carbon and downloads unpublished tarballs from its runs |
-| `SLACK_WEBHOOK_URL` | Optional. Posts failures to Slack                                                                                 |
-
-## Connecting upstream
-
-The update workflow accepts `carbon-published` dispatches when updates are
-enabled. The unpublished tarball example below remains disabled.
-
-### After each release
-
-Add these steps to the end of the `build` job in upstream
-`.github/workflows/release.yml`, after `Publish packages`. They need the GitHub
-App already used upstream to be installed on this repository.
-
-```yaml
-- name: Generate token for carbon-next-test
-  if: env.DIST_TAG == 'v12-alpha'
-  id: next_test_token
-  uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
-  with:
-    app-id: ${{ secrets.APP_ID }}
-    private-key: ${{ secrets.APP_PRIVATE_KEY }}
-    repositories: carbon-next-test
-
-- name: Request a dependency update
-  if: env.DIST_TAG == 'v12-alpha'
-  env:
-    GH_TOKEN: ${{ steps.next_test_token.outputs.token }}
-  run: |
-    gh api repos/carbon-design-system/carbon-next-test/dispatches \
-      -f event_type=carbon-published \
-      -f "client_payload[ref]=${{ github.ref_name }}" \
-      -f "client_payload[sha]=${{ github.sha }}"
-```
-
-### On every commit
-
-When packages change on `next`, `next-release.yml` creates an alpha tag and
-`release.yml` publishes the packages. Send the dispatch after `Publish packages`
-succeeds. To test commits without publishing them, a workflow on pushes to
-`next` can upload tarballs and pass its run ID instead. This runs alongside
-upstream CI and does not add time to it:
-
-```yaml
-- run: yarn build
-- run: |
-    mkdir carbon-tarballs
-    yarn workspaces foreach --all --no-private \
-      exec npm pack --pack-destination "$GITHUB_WORKSPACE/carbon-tarballs"
-- uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-  with:
-    name: carbon-tarballs
-    path: carbon-tarballs
-- env:
-    GH_TOKEN: ${{ steps.next_test_token.outputs.token }}
-  run: |
-    gh api repos/carbon-design-system/carbon-next-test/dispatches \
-      -f event_type=carbon-tarballs \
-      -f "client_payload[ref]=${{ github.sha }}" \
-      -f "client_payload[sha]=${{ github.sha }}" \
-      -f "client_payload[run_id]=${{ github.run_id }}"
-```
+For GitHub App setup, repository secrets, and upstream integration, see the
+[developer handbook](docs/developer-handbook.md). These instructions are for
+repository maintainers. You do not need a GitHub App or secrets to run the tests
+locally.
 
 ## Consumer workarounds in the apps
 
