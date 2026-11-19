@@ -88,9 +88,27 @@ the workflow summary.
 
 ## CI
 
-`.github/workflows/test.yml` currently runs only through manual dispatch, with a
-dist-tag or git ref. Other triggers are disabled during setup. Automatic
-dependency PRs and PR lockfile validation are not configured yet.
+`.github/workflows/test.yml` runs on PRs and pushes to `main`. React 19 jobs
+install the committed catalog and lockfile with `--immutable`, without selecting
+new package versions. The React 18 compatibility job uses the same Carbon
+release set with a separate React 18 install.
+
+Manual runs can still select a dist-tag or git ref.
+
+`.github/workflows/update.yml` checks `v12-alpha` hourly, accepts a
+`carbon-published` dispatch, or runs manually with an alpha tag. It checks that
+the complete release set is published, then creates or updates one dependency PR
+containing `carbon-release.json`, `.yarnrc.yml`, and `yarn.lock`. No PR is
+needed when these files already match `main`.
+
+To enable updates, install the Carbon GitHub App on this repository with
+Contents and Pull requests write permissions, provide `APP_ID` and
+`APP_PRIVATE_KEY`, and set `ENABLE_DEPENDENCY_UPDATES` to `true`. Updates run
+only in `carbon-design-system/carbon-next-test`. An App token lets the PR checks
+start automatically.
+
+After validating the workflow, require the `Report` check on `main`. Dependency
+PRs remain blocked while required checks fail.
 
 Slack and upstream statuses are disabled by default. Keep
 `ENABLE_SLACK_NOTIFICATIONS` and `ENABLE_UPSTREAM_STATUS` unset during setup.
@@ -99,12 +117,15 @@ Secrets:
 
 | Secret              | Used for                                                                                                          |
 | ------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `APP_ID`            | Required for automatic updates. Carbon GitHub App ID                                                              |
+| `APP_PRIVATE_KEY`   | Required for automatic updates. Carbon GitHub App private key                                                     |
 | `CARBON_REPO_TOKEN` | Optional. Reports a commit status on carbon-design-system/carbon and downloads unpublished tarballs from its runs |
 | `SLACK_WEBHOOK_URL` | Optional. Posts failures to Slack                                                                                 |
 
 ## Connecting upstream
 
-These examples are not enabled in this setup; `repository_dispatch` is disabled.
+The update workflow accepts `carbon-published` dispatches when updates are
+enabled. The unpublished tarball example below remains disabled.
 
 ### After each release
 
@@ -122,7 +143,7 @@ App already used upstream to be installed on this repository.
     private-key: ${{ secrets.APP_PRIVATE_KEY }}
     repositories: carbon-next-test
 
-- name: Test the published packages
+- name: Request a dependency update
   if: env.DIST_TAG == 'v12-alpha'
   env:
     GH_TOKEN: ${{ steps.next_test_token.outputs.token }}
@@ -155,7 +176,7 @@ upstream CI and does not add time to it:
     GH_TOKEN: ${{ steps.next_test_token.outputs.token }}
   run: |
     gh api repos/carbon-design-system/carbon-next-test/dispatches \
-      -f event_type=carbon-published \
+      -f event_type=carbon-tarballs \
       -f "client_payload[ref]=${{ github.sha }}" \
       -f "client_payload[sha]=${{ github.sha }}" \
       -f "client_payload[run_id]=${{ github.run_id }}"

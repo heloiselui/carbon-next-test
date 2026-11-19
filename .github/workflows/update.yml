@@ -1,0 +1,90 @@
+name: Update Carbon
+
+on:
+  schedule:
+    - cron: '23 * * * *'
+  repository_dispatch:
+    types: [carbon-published]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Published upstream alpha tag (empty uses v12-alpha)
+        type: string
+        required: false
+
+concurrency:
+  group: update-carbon
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  update:
+    name: Create dependency update PR
+    if: >-
+      github.repository == 'carbon-design-system/carbon-next-test' &&
+      vars.ENABLE_DEPENDENCY_UPDATES == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - name: Select published release
+        id: release
+        env:
+          REF: ${{ inputs.ref || github.event.client_payload.ref }}
+        run: |
+          if [ -z "$REF" ]; then
+            node scripts/use-carbon.mjs --tag v12-alpha
+            REF=$(node -p "JSON.parse(require('node:fs').readFileSync('carbon-release.json', 'utf8')).gitRef || ''")
+          fi
+          if [[ ! "$REF" =~ ^v12\.[0-9]+\.[0-9]+-alpha\.[0-9]+$ ]]; then
+            echo 'Expected a published v12 alpha tag' >&2
+            exit 1
+          fi
+          # Store a fixed release ref even when polling the moving npm tag.
+          node scripts/use-carbon.mjs --ref "$REF"
+          printf 'ref=%s\n' "$REF" >> "$GITHUB_OUTPUT"
+      - name: Update lockfile
+        env:
+          YARN_ENABLE_IMMUTABLE_INSTALLS: 'false'
+        run: |
+          node .yarn/releases/yarn-4.10.3.cjs install
+          git diff --exit-code -- package.json
+      - name: Generate update token
+        id: token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          repositories: carbon-next-test
+          permission-contents: write
+          permission-pull-requests: write
+      - name: Create or update PR
+        uses: peter-evans/create-pull-request@3ffccacd46053766916f087ce41d627c0b8cf2d1 # v8.1.3
+        with:
+          token: ${{ steps.token.outputs.token }}
+          base: main
+          branch: chore/update-carbon-alpha
+          author:
+            github-actions[bot]
+            <41898282+github-actions[bot]@users.noreply.github.com>
+          commit-message:
+            'chore: update Carbon packages to ${{ steps.release.outputs.ref }}'
+          title:
+            'chore: update Carbon packages to ${{ steps.release.outputs.ref }}'
+          body: |
+            Updates the Carbon packages to `${{ steps.release.outputs.ref }}`.
+
+            The catalog and lockfile were generated with the bundled Yarn version.
+            CI tests the committed release set. Review the results before merging.
+          add-paths: |
+            carbon-release.json
+            .yarnrc.yml
+            yarn.lock

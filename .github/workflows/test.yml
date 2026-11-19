@@ -1,7 +1,10 @@
 name: Test Carbon next
 
 on:
-  # Automatic triggers stay disabled during initial setup.
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       tag:
@@ -49,16 +52,19 @@ jobs:
       - name: Resolve
         id: release
         env:
+          EVENT_NAME: ${{ github.event_name }}
           TAG: ${{ inputs.tag || 'v12-alpha' }}
           REF: ${{ inputs.ref || github.event.client_payload.ref }}
           RUN_ID: ${{ github.event.client_payload.run_id }}
         run: |
-          if [ -n "$RUN_ID" ]; then
-            node scripts/use-carbon.mjs --tarballs carbon-tarballs --git-ref "$REF"
-          elif [ -n "$REF" ]; then
-            node scripts/use-carbon.mjs --ref "$REF"
-          else
-            node scripts/use-carbon.mjs --tag "$TAG"
+          if [ "$EVENT_NAME" = workflow_dispatch ]; then
+            if [ -n "$RUN_ID" ]; then
+              node scripts/use-carbon.mjs --tarballs carbon-tarballs --git-ref "$REF"
+            elif [ -n "$REF" ]; then
+              node scripts/use-carbon.mjs --ref "$REF"
+            else
+              node scripts/use-carbon.mjs --tag "$TAG"
+            fi
           fi
           {
             echo '## Release set'
@@ -102,6 +108,7 @@ jobs:
       - uses: ./.github/actions/install
         with:
           react: 19
+          immutable: ${{ github.event_name != 'workflow_dispatch' }}
       - run: node .yarn/releases/yarn-4.10.3.cjs test:contract
       - name: Report public API changes
         if: always()
@@ -142,6 +149,9 @@ jobs:
       - uses: ./.github/actions/install
         with:
           react: ${{ matrix.react }}
+          immutable:
+            ${{ github.event_name != 'workflow_dispatch' && matrix.react == 19
+            }}
       - name: Build
         run: |
           for app in ${APPS//,/ }; do

@@ -241,6 +241,9 @@ if (source.type === 'tarballs') {
   // Unpublished versions can only be reached transitively through overrides.
   Object.assign(packageJson.resolutions, sorted);
 }
+if (Object.keys(packageJson.resolutions).length === 0) {
+  delete packageJson.resolutions;
+}
 await fs.writeFile(
   packageJsonPath,
   JSON.stringify(packageJson, null, 2) + '\n'

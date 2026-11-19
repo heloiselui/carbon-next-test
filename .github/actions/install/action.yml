@@ -1,10 +1,15 @@
 name: Install release set
 description:
-  Applies the release set from the resolve job and installs dependencies
+  Installs committed dependencies or applies the release set from the resolve
+  job
 inputs:
   react:
     description: React major version
     required: true
+  immutable:
+    description:
+      Install the committed catalog and lockfile without rewriting them
+    default: 'false'
 runs:
   using: composite
   steps:
@@ -15,9 +20,20 @@ runs:
     - name: Install
       shell: bash
       env:
-        # The catalog changes with every release set, so the lockfile does too.
-        YARN_ENABLE_IMMUTABLE_INSTALLS: 'false'
+        REACT: ${{ inputs.react }}
+        IMMUTABLE: ${{ inputs.immutable }}
       run: |
-        if [ -d .release/carbon-tarballs ]; then mv .release/carbon-tarballs carbon-tarballs; fi
-        node scripts/use-carbon.mjs --release .release/carbon-release.json --react ${{ inputs.react }}
-        node .yarn/releases/yarn-4.10.3.cjs install
+        if [ "$IMMUTABLE" = true ]; then
+          node --input-type=module -e '
+            import assert from "node:assert/strict";
+            import fs from "node:fs";
+            const release = JSON.parse(fs.readFileSync("carbon-release.json", "utf8"));
+            assert.equal(release.react, Number(process.env.REACT), "Committed React major does not match the job");
+          '
+          node .yarn/releases/yarn-4.10.3.cjs install --immutable
+          git diff --exit-code -- carbon-release.json .yarnrc.yml yarn.lock package.json
+        else
+          if [ -d .release/carbon-tarballs ]; then mv .release/carbon-tarballs carbon-tarballs; fi
+          node scripts/use-carbon.mjs --release .release/carbon-release.json --react "$REACT"
+          YARN_ENABLE_IMMUTABLE_INSTALLS=false node .yarn/releases/yarn-4.10.3.cjs install
+        fi
