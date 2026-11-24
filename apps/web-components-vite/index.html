@@ -22,7 +22,18 @@
       >
       <cds-tag data-testid="tag" type="blue">v12</cds-tag>
       <cds-toggle data-testid="toggle" label-text="Enable"></cds-toggle>
-      <cds-text-input label="Name"></cds-text-input>
+      <form id="consumer-form">
+        <fieldset>
+          <legend>Account details</legend>
+          <cds-text-input
+            label="Name"
+            name="name"
+            value="Carbon User"></cds-text-input>
+        </fieldset>
+        <button type="submit">Save account</button>
+        <button type="reset">Reset account</button>
+      </form>
+      <output id="form-result" aria-label="Submitted form values"></output>
       <cds-number-input
         label="Count"
         min="0"
@@ -42,9 +53,15 @@
         <cds-menu>
           <cds-menu-item label="Edit"></cds-menu-item>
           <cds-menu-item-divider></cds-menu-item-divider>
-          <cds-menu-item kind="danger" label="Delete"></cds-menu-item>
+          <cds-menu-item
+            id="delete-action"
+            kind="danger"
+            label="Delete"></cds-menu-item>
         </cds-menu>
       </cds-overflow-menu>
+      <p id="menu-action" role="status" aria-label="Last menu action">
+        No action selected
+      </p>
       <cds-user-avatar
         name="Carbon User"
         tooltip-text="Carbon User"></cds-user-avatar>

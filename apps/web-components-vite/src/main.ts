@@ -19,3 +19,22 @@ const panel = document.getElementById('side-panel');
 document.getElementById('open-panel')?.addEventListener('click', () => {
   panel?.setAttribute('open', '');
 });
+
+const menuAction = document.getElementById('menu-action');
+document.getElementById('delete-action')?.addEventListener('click', () => {
+  if (menuAction) {
+    menuAction.textContent = 'Delete';
+  }
+});
+
+document
+  .getElementById('consumer-form')
+  ?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const result = document.getElementById('form-result');
+    if (result) {
+      result.textContent = JSON.stringify([
+        ...new FormData(event.currentTarget as HTMLFormElement),
+      ]);
+    }
+  });

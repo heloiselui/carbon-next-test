@@ -22,10 +22,11 @@ import {
   UserAvatar,
   useFeatureFlag,
 } from '@carbon/react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 export function Showcase({ renderedAt }: { renderedAt: string }) {
   const [panelOpen, setPanelOpen] = useState(false);
+  const launcherButtonRef = useRef<HTMLButtonElement>(null!);
   const v12 = useFeatureFlag('enable-v12-release');
 
   return (
@@ -47,6 +48,7 @@ export function Showcase({ renderedAt }: { renderedAt: string }) {
               </p>
             </Tile>
             <Button
+              ref={launcherButtonRef}
               data-testid="primary-button"
               renderIcon={Add}
               onClick={() => setPanelOpen(true)}>
@@ -72,6 +74,7 @@ export function Showcase({ renderedAt }: { renderedAt: string }) {
           Modal content
         </Modal>
         <SidePanel
+          launcherButtonRef={launcherButtonRef}
           open={panelOpen}
           onRequestClose={() => setPanelOpen(false)}
           size="md"

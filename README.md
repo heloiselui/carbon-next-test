@@ -8,7 +8,7 @@ published packages, such as missing files, mismatched internal versions, broken
 entry points, or builds that fail in a framework.
 
 Component behavior, accessibility, and visual regressions are tested upstream.
-This repo does not repeat those tests.
+This repo adds focused integration checks against the published packages.
 
 ## What runs
 
@@ -22,6 +22,12 @@ This repo does not repeat those tests.
 | Web Components + Vite    | `apps/web-components-vite`    | TypeScript, production build, element registration, browser smoke tests                                                                                                                                                                                         |
 | Web Components + webpack | `apps/web-components-webpack` | webpack 5 with `sass-loader`, browser smoke tests                                                                                                                                                                                                               |
 | Sass                     | `apps/styles-sass`            | `@carbon/styles`, `@carbon/react`, `@carbon/elements`, grid, type, and every theme compile; custom `$prefix` is applied everywhere; Sass deprecations are reported                                                                                              |
+
+The browser checks exercise overlay closing and focus restoration, menu actions
+received by the application, and registration of elements in open shadow roots.
+The Web Components Vite app also checks native form submission, reset, and
+disabled fieldsets. These are consumer scenarios for selected components; they
+do not cover every component or every state.
 
 ## Running locally
 

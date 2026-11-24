@@ -38,7 +38,7 @@ import {
   TruncatedText,
   UserAvatar,
 } from '@carbon/react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 const headers = [
   { key: 'name', header: 'Name' },
@@ -52,6 +52,8 @@ const rows = [
 
 export function App() {
   const [panelOpen, setPanelOpen] = useState(false);
+  const [menuAction, setMenuAction] = useState('No action selected');
+  const launcherButtonRef = useRef<HTMLButtonElement>(null!);
 
   return (
     <Theme theme="white">
@@ -79,6 +81,7 @@ export function App() {
               />
             </Tile>
             <Button
+              ref={launcherButtonRef}
               data-testid="primary-button"
               renderIcon={Add}
               onClick={() => setPanelOpen(true)}>
@@ -110,8 +113,15 @@ export function App() {
             <OverflowMenu label="Actions">
               <MenuItem label="Edit" />
               <MenuItemDivider />
-              <MenuItem kind="danger" label="Delete" />
+              <MenuItem
+                kind="danger"
+                label="Delete"
+                onClick={() => setMenuAction('Delete')}
+              />
             </OverflowMenu>
+            <p role="status" aria-label="Last menu action">
+              {menuAction}
+            </p>
             <UserAvatar name="Carbon User" tooltipText="Carbon User" />
             <InlineNotification
               kind="info"
@@ -159,6 +169,7 @@ export function App() {
           </Column>
         </Grid>
         <SidePanel
+          launcherButtonRef={launcherButtonRef}
           open={panelOpen}
           onRequestClose={() => setPanelOpen(false)}
           size="md"
