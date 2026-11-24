@@ -68,16 +68,18 @@ export function installPublished(name, version) {
 }
 
 function jsExports(dir) {
+  const { name } = JSON.parse(
+    fs.readFileSync(path.join(dir, 'package.json'), 'utf8')
+  );
   const output = execFileSync(
     process.execPath,
     [
       '--input-type=module',
       '-e',
-      `const mod = await import(${JSON.stringify(dir + '/')} + process.argv[1]);
+      `const mod = await import(${JSON.stringify(name)});
        console.log(JSON.stringify(Object.keys(mod).filter((key) => key !== 'default')));`,
-      JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')).main,
     ],
-    { stdio: ['ignore', 'pipe', 'pipe'] }
+    { cwd: dir, stdio: ['ignore', 'pipe', 'pipe'] }
   );
   return JSON.parse(output.toString());
 }

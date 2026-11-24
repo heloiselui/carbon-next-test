@@ -114,3 +114,29 @@ test('detects removal of a public attribute during a WCA-to-CEM migration', () =
     ['<cds-button disabled>']
   );
 });
+
+test.each([
+  ['exports without main', { exports: './public.js' }],
+  [
+    'exports overriding main',
+    { main: './legacy.js', exports: { '.': { import: './public.js' } } },
+  ],
+  ['legacy main', { main: './public.js' }],
+])('reads the public JavaScript entry point: %s', (_, entryPoints) => {
+  const packageDir = path.join(directory, 'node_modules', '@test', 'api');
+  fs.mkdirSync(packageDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(packageDir, 'package.json'),
+    JSON.stringify({ name: '@test/api', type: 'module', ...entryPoints })
+  );
+  fs.writeFileSync(
+    path.join(packageDir, 'public.js'),
+    'export const PublicComponent = {}; export default {};'
+  );
+  fs.writeFileSync(
+    path.join(packageDir, 'legacy.js'),
+    'export const LegacyComponent = {};'
+  );
+
+  expect(readApi(packageDir, 'js')).toEqual(['PublicComponent']);
+});
